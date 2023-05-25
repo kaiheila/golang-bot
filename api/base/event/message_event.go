@@ -19,6 +19,7 @@ type MessageTextExtra struct {
 	MentionRoles []string `json:"mention_roles"`
 	MentionHere  bool     `json:"mention_here"`
 	Author       User     `json:"author"`
+	Code         string   `json:"code"`
 }
 
 type User struct {
