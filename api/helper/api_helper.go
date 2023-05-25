@@ -50,14 +50,16 @@ func NewApiHelper(path, token, baseUrl, apiType, language string) *ApiHelper {
 
 	return apiHelper
 }
-func (h *ApiHelper) SetQuery(values map[string]string) {
+func (h *ApiHelper) SetQuery(values map[string]string) *ApiHelper {
 
 	for k, v := range values {
 		if h.QueryParam == "" {
-			h.QueryParam = fmt.Sprintf("&%s=%s", k, v)
+			h.QueryParam = fmt.Sprintf("%s=%s", k, v)
+		} else {
+			h.QueryParam += fmt.Sprintf("&%s=%s", k, v)
 		}
-		h.QueryParam += fmt.Sprintf("&%s=%s", k, v)
 	}
+	return h
 
 }
 

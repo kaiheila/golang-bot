@@ -1,3 +1,5 @@
 session.pid
 .idea/
 example/conf/config.go
+example/conf/config.go.dev
+example/conf/config.go.prod

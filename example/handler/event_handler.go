@@ -15,7 +15,8 @@ type ReceiveFrameHandler struct {
 }
 
 func (rf *ReceiveFrameHandler) Handle(e event.Event) error {
-	log.WithField("event", e).Info("ReceiveFrameHandler receive frame.")
+	log.WithField("event", e).WithField("data", e.Data()).Info("ReceiveFrameHandler receive frame.")
+
 	return nil
 }
 

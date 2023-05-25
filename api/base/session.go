@@ -32,6 +32,7 @@ func (s *Session) Trigger(eventName string, params event.M) {
 		event.AsyncFire(event.NewBasic(eventName, params))
 	}
 }
+
 func (s *Session) ReceiveData(data []byte) (error, []byte) {
 	if s.Compressed == 1 {
 		b := bytes.NewReader(data)
