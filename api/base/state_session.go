@@ -339,6 +339,9 @@ func (s *StateSession) SendHeartBeat() error {
 		log.WithField("ping", string(data)).Info("Send Ping")
 		err = s.NetworkProxy.SendData(data)
 		if err != nil {
+			log.WithField("err", err).Error("SendHeartBeat failed!")
+			//发送错误，立即认为pong过期
+			s.PongTimeoutChan <- s.LastPingAt.Add(-1)
 			return err
 		} else {
 			s.PongTimeoutChan <- s.LastPingAt.Add(time.Duration(s.Timeout) * time.Second)

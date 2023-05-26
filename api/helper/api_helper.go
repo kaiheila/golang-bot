@@ -6,7 +6,10 @@ import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"io"
+	"mime/multipart"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -21,15 +24,20 @@ const (
 )
 
 type ApiHelper struct {
-	Token       string
-	Type        string
-	Language    string
-	BaseUrl     string
-	QueryParam  string
-	Path        string
-	Body        []byte
-	ContentType ContentType
-	Method      HttpMethod
+	Token          string
+	Type           string
+	Language       string
+	BaseUrl        string
+	QueryParam     string
+	Path           string
+	Body           []byte
+	ContentType    ContentType
+	Method         HttpMethod
+	File           string
+	FileFieldName  string
+	ContentTypeStr string
+	err            error
+	BodyBuffer     *bytes.Buffer
 }
 
 func NewApiHelper(path, token, baseUrl, apiType, language string) *ApiHelper {
@@ -68,8 +76,43 @@ func (h *ApiHelper) SetBody(body []byte) *ApiHelper {
 	return h
 }
 
-func (h *ApiHelper) SetContentType(contentType ContentType) {
+func (h *ApiHelper) SetContentType(contentType ContentType) *ApiHelper {
 	h.ContentType = contentType
+	return h
+}
+
+func (h *ApiHelper) SetUploadFile(filePath string) *ApiHelper {
+	bodyBuf := &bytes.Buffer{}
+	bodyWriter := multipart.NewWriter(bodyBuf)
+	fileName := filepath.Base(filePath)
+	// this step is very important
+	fileWriter, err := bodyWriter.CreateFormFile("file", fileName)
+	if err != nil {
+		log.Error(err)
+		h.err = err
+		return h
+	}
+
+	// open file handle
+	fh, err := os.Open(filePath)
+	defer fh.Close()
+	if err != nil {
+		log.Error(err)
+		h.err = err
+		return h
+	}
+
+	//iocopy
+	_, err = io.Copy(fileWriter, fh)
+	if err != nil {
+		log.Error(err)
+		h.err = err
+		return h
+	}
+	bodyWriter.Close()
+	h.BodyBuffer = bodyBuf
+	h.ContentTypeStr = bodyWriter.FormDataContentType()
+	return h
 }
 func (h *ApiHelper) Get() ([]byte, error) {
 	h.Method = MethodGet
@@ -79,7 +122,11 @@ func (h *ApiHelper) Post() ([]byte, error) {
 	h.Method = MethodPost
 	return h.Send()
 }
+
 func (h *ApiHelper) Send() ([]byte, error) {
+	if h.err != nil {
+		return nil, h.err
+	}
 	client := &http.Client{}
 	reqPath := ""
 	if strings.HasPrefix(h.Path, "/") || strings.HasSuffix(h.BaseUrl, "/") {
@@ -94,13 +141,19 @@ func (h *ApiHelper) Send() ([]byte, error) {
 	var err error
 	if h.Body != nil {
 		req, err = http.NewRequest(string(h.Method), reqPath, bytes.NewBuffer(h.Body))
+	} else if h.BodyBuffer != nil {
+		req, err = http.NewRequest(string(h.Method), reqPath, h.BodyBuffer)
 	} else {
 		req, err = http.NewRequest(string(h.Method), reqPath, nil)
 	}
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", string(h.ContentType))
+	if h.ContentTypeStr != "" {
+		req.Header.Set("Content-Type", h.ContentTypeStr)
+	} else {
+		req.Header.Set("Content-Type", string(h.ContentType))
+	}
 	req.Header.Set("Authorization", fmt.Sprintf("%s %s", h.Type, h.Token))
 	req.Header.Set("Accept-Language", h.Language)
 

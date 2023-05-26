@@ -90,7 +90,10 @@ func (ws *WebSocketSession) ConnectWebsocket(gateway string) error {
 
 	ws.wsConnectOk()
 	go func() {
-		defer c.Close()
+		defer func() {
+			c.Close()
+			ws.StateSession.Reconnect()
+		}()
 		for {
 			_, message, err := c.ReadMessage()
 			if err != nil {
