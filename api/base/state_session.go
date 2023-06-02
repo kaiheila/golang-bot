@@ -235,7 +235,10 @@ func (s *StateSession) Retry(e *fsm.Event, handler func() error, errHandler func
 func (s *StateSession) getGateWayOK(gateWay string) {
 	log.WithField("gateway", gateWay).Info("GetGatewayOk")
 	s.GateWay = gateWay
-	s.FSM.Event(context.Background(), EventGotGateway)
+	err := s.FSM.Event(context.Background(), EventGotGateway)
+	if err != nil {
+		log.Error(err)
+	}
 }
 
 // WsConnect : Try to websocket connect
@@ -245,18 +248,21 @@ func (s *StateSession) WsConnect() error {
 
 func (s *StateSession) wsConnectFail() error {
 	log.Warn("wsConnectFail")
-	s.FSM.Event(context.Background(), EventWsConnectFail)
+	error := s.FSM.Event(context.Background(), EventWsConnectFail)
+	log.Error(error)
 	return nil
 }
 
 func (s *StateSession) wsConnectOk() {
 	log.Info("wsConnectOk")
-	s.FSM.Event(context.Background(), EventWsConnected)
+	error := s.FSM.Event(context.Background(), EventWsConnected)
+	log.Error(error)
 }
 
 func (s *StateSession) helloFail() {
 	log.Info("helloFail")
-	s.FSM.Event(context.Background(), EventHelloFail)
+	error := s.FSM.Event(context.Background(), EventHelloFail)
+	log.Error(error)
 }
 
 func (s *StateSession) receiveHello(frameMap *event2.FrameMap) {
@@ -368,31 +374,35 @@ func (s *StateSession) receivePong(frame *event2.FrameMap) {
 
 func (s *StateSession) StartCheckHeartbeat() {
 	log.Info("Start heartBeatTimeout check")
-	go func() {
+	go func() { //nolint:wsl
 		for {
 			select {
 			case pongTimeoutAt := <-s.PongTimeoutChan:
 				{
-					log.WithField("pongTimeoutAt", pongTimeoutAt).Info("check pong receive timeout")
+					log.WithField("pongTimeoutAt", pongTimeoutAt).WithField("state", s.FSM.Current()).Info("check pong receive timeout")
 					if s.FSM.Current() != StatusConnected && s.FSM.Current() != StatusRetry {
 						continue
 					}
-					if time.Now().Before(pongTimeoutAt) { //还没有到的timeout检查时间点
-						time.Sleep(pongTimeoutAt.Sub(time.Now()))
-						//最后收到Pong时间比（约定检查时间-最大过期时间）早，表示在过去的约定的过期时间内及之后没有收到Pong
+					if time.Now().Before(pongTimeoutAt) {
+						time.Sleep(time.Until(pongTimeoutAt.Add(1 * time.Second)))
+					}
+
+					if time.Now().After(pongTimeoutAt) { //nolint:nestif
+						// 还没有到的timeout检查时间点
+
+						// 最后收到Pong时间比（约定检查时间-最大过期时间）早，表示在过去的约定的过期时间内及之后没有收到Pong
 						if s.LastPongAt.Before(pongTimeoutAt.Add(-time.Duration(s.Timeout) * time.Second)) {
-							log.Info("Pong not received before:%s", pongTimeoutAt)
+							log.Infof("Pong not received before:%s", pongTimeoutAt)
 							if s.FSM.Current() == StatusConnected {
 								err := s.FSM.Event(context.Background(), EventHeartbeatTimeout)
 								if err == nil {
 									s.HeartBeatCron.Stop()
 								}
 							}
-
 							if s.FSM.Current() == StatusRetry {
-
 								err := s.FSM.Event(context.Background(), EventRetryHeartbeatTimeout)
 								if err == nil {
+									s.FSM.Event(context.Background(), EventRetryHeartbeatTimeout)
 								}
 							}
 						}
