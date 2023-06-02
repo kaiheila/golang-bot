@@ -114,8 +114,8 @@ func NewStateSession(gateway string, compressed int) *StateSession {
 			{Name: EventWsConnectFail, Src: []string{StatusGateway}, Dst: StatusInit},
 			{Name: EventHelloReceived, Src: []string{StatusWSConnected}, Dst: StatusConnected},
 			{Name: EventHelloFail, Src: []string{StatusWSConnected}, Dst: StatusGateway},
-			{Name: EventHelloGatewayErrFail, Src: []string{StatusWSConnected}, Dst: StatusInit},                //hello收到特定错误码：40100, 40101, 40102, 40103等
-			{Name: EventPongReceived, Src: []string{StatusConnected, StatusWSConnected}, Dst: StatusConnected}, //??StatusWSConnected
+			{Name: EventHelloGatewayErrFail, Src: []string{StatusWSConnected}, Dst: StatusInit},                             //hello收到特定错误码：40100, 40101, 40102, 40103等
+			{Name: EventPongReceived, Src: []string{StatusConnected, StatusWSConnected, StatusRetry}, Dst: StatusConnected}, //??StatusWSConnected
 			{Name: EventHeartbeatTimeout, Src: []string{StatusConnected}, Dst: StatusRetry},
 			{Name: EventRetryHeartbeatTimeout, Src: []string{StatusRetry}, Dst: StatusGateway},
 			{Name: EventResumeReceivedOk, Src: []string{StatusWSConnected, StatusConnected}, Dst: StatusConnected},
@@ -148,6 +148,7 @@ func NewStateSession(gateway string, compressed int) *StateSession {
 	s.HeartBeatCron.AddFunc(fmt.Sprintf("@every %ds", interval), func() {
 		s.SendHeartBeat()
 	})
+	s.Timeout = 7
 	s.PongTimeoutChan = make(chan time.Time)
 	return s
 }
@@ -248,21 +249,29 @@ func (s *StateSession) WsConnect() error {
 
 func (s *StateSession) wsConnectFail() error {
 	log.Warn("wsConnectFail")
-	error := s.FSM.Event(context.Background(), EventWsConnectFail)
-	log.Error(error)
+	err := s.FSM.Event(context.Background(), EventWsConnectFail)
+	if err != nil {
+		log.Error(err)
+	}
 	return nil
 }
 
 func (s *StateSession) wsConnectOk() {
 	log.Info("wsConnectOk")
-	error := s.FSM.Event(context.Background(), EventWsConnected)
-	log.Error(error)
+	err := s.FSM.Event(context.Background(), EventWsConnected)
+	if err != nil {
+		log.Error(err)
+	}
+
 }
 
 func (s *StateSession) helloFail() {
 	log.Info("helloFail")
-	error := s.FSM.Event(context.Background(), EventHelloFail)
-	log.Error(error)
+	err := s.FSM.Event(context.Background(), EventHelloFail)
+	if err != nil {
+		log.Error(err)
+	}
+
 }
 
 func (s *StateSession) receiveHello(frameMap *event2.FrameMap) {
@@ -405,6 +414,8 @@ func (s *StateSession) StartCheckHeartbeat() {
 									s.FSM.Event(context.Background(), EventRetryHeartbeatTimeout)
 								}
 							}
+						} else {
+							s.FSM.Event(context.Background(), EventPongReceived)
 						}
 					}
 				}
