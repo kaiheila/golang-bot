@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"strconv"
 	"sync"
+	"time"
 )
 
 type WebSocketSession struct {
@@ -75,11 +76,24 @@ func (ws *WebSocketSession) ReqGateWay() (error, string) {
 
 }
 func (ws *WebSocketSession) ConnectWebsocket(gateway string) error {
+	if ws.WsConn != nil {
+		err := ws.WsConn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+		if err != nil {
+			log.Error(err)
+		}
+		err = ws.WsConn.Close()
+		if err != nil {
+			log.Error(err)
+		}
+		ws.WsConn = nil
+		//等3秒让之前的链接被服务器释放
+		time.Sleep(time.Duration(3 * time.Second))
+	}
+
 	if ws.SessionId != "" {
 		gateway += "&" + fmt.Sprintf("sn=%d&sessionId=%s&resume=1", ws.MaxSn, ws.SessionId)
 	}
 	log.WithField("gateway", gateway).Info("ConnectWebsocket")
-
 	c, resp, err := websocket.DefaultDialer.Dial(gateway, nil)
 	log.Infof("webscoket dial resp:%+v", resp)
 	if err != nil {
@@ -91,8 +105,10 @@ func (ws *WebSocketSession) ConnectWebsocket(gateway string) error {
 	ws.wsConnectOk()
 	go func() {
 		defer func() {
-			c.Close()
-			ws.StateSession.Reconnect()
+			if c != nil {
+				c.Close()
+			}
+			//ws.StateSession.Reconnect()
 		}()
 		for {
 			_, message, err := c.ReadMessage()
@@ -109,6 +125,7 @@ func (ws *WebSocketSession) ConnectWebsocket(gateway string) error {
 	}()
 	return nil
 }
+
 func (ws *WebSocketSession) SendData(data []byte) error {
 	ws.WsWriteLock.Lock()
 	defer ws.WsWriteLock.Unlock()

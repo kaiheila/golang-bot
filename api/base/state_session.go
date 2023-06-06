@@ -138,7 +138,7 @@ func NewStateSession(gateway string, compressed int) *StateSession {
 				s.StartCheckHeartbeat()
 			},
 			EventEnterPrefix + StatusRetry: func(_ context.Context, e *fsm.Event) {
-				s.Retry(e, func() error { s.SendHeartBeat(); return errors.New("just for continue to send heartbeat") }, nil)
+				s.Retry(e, func() error { s.HeartBeatCron.Stop(); s.SendHeartBeat(); log.Info("重试发送心跳包"); return nil }, nil)
 			},
 		},
 	)
@@ -149,7 +149,7 @@ func NewStateSession(gateway string, compressed int) *StateSession {
 		s.SendHeartBeat()
 	})
 	s.Timeout = 7
-	s.PongTimeoutChan = make(chan time.Time)
+	s.PongTimeoutChan = make(chan time.Time, 10)
 	return s
 }
 
@@ -226,7 +226,7 @@ func (s *StateSession) Retry(e *fsm.Event, handler func() error, errHandler func
 		retry.Delay(time.Second*time.Duration(firstDelay)),
 		retry.MaxDelay(time.Second*time.Duration(maxTime)),
 		retry.Attempts(uint(maxRetry)),
-		retry.OnRetry(func(n uint, err error) { log.WithError(err).Info("try %d times call function %s", n, handler) }),
+		retry.OnRetry(func(n uint, err error) { log.WithError(err).Infof("try %d times call function %s", n, handler) }),
 	)
 	if err != nil && errHandler != nil {
 		errHandler()
@@ -388,7 +388,7 @@ func (s *StateSession) StartCheckHeartbeat() {
 			select {
 			case pongTimeoutAt := <-s.PongTimeoutChan:
 				{
-					log.WithField("pongTimeoutAt", pongTimeoutAt).WithField("state", s.FSM.Current()).Info("check pong receive timeout")
+					log.WithField("pongTimeoutAt", pongTimeoutAt).WithField("state", s.FSM.Current()).Info("Pong收取超时检测开始")
 					if s.FSM.Current() != StatusConnected && s.FSM.Current() != StatusRetry {
 						continue
 					}
@@ -398,19 +398,19 @@ func (s *StateSession) StartCheckHeartbeat() {
 
 					if time.Now().After(pongTimeoutAt) { //nolint:nestif
 						// 还没有到的timeout检查时间点
-
 						// 最后收到Pong时间比（约定检查时间-最大过期时间）早，表示在过去的约定的过期时间内及之后没有收到Pong
 						if s.LastPongAt.Before(pongTimeoutAt.Add(-time.Duration(s.Timeout) * time.Second)) {
 							log.Infof("Pong not received before:%s", pongTimeoutAt)
 							if s.FSM.Current() == StatusConnected {
 								err := s.FSM.Event(context.Background(), EventHeartbeatTimeout)
-								if err == nil {
-									s.HeartBeatCron.Stop()
+								if err != nil {
+									log.Error(err)
 								}
 							}
 							if s.FSM.Current() == StatusRetry {
 								err := s.FSM.Event(context.Background(), EventRetryHeartbeatTimeout)
-								if err == nil {
+								if err != nil {
+									log.Error(err)
 									s.FSM.Event(context.Background(), EventRetryHeartbeatTimeout)
 								}
 							}
