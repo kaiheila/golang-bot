@@ -34,6 +34,6 @@ func main() {
 		resp.Write(resData)
 	})
 
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", conf.HTTPServerPort), nil))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf("0.0.0.0:%s", conf.HTTPServerPort), nil))
 
 }

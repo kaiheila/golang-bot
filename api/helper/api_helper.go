@@ -8,6 +8,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -123,11 +124,7 @@ func (h *ApiHelper) Post() ([]byte, error) {
 	return h.Send()
 }
 
-func (h *ApiHelper) Send() ([]byte, error) {
-	if h.err != nil {
-		return nil, h.err
-	}
-	client := &http.Client{}
+func (h *ApiHelper) getReqPath() string {
 	reqPath := ""
 	if strings.HasPrefix(h.Path, "/") || strings.HasSuffix(h.BaseUrl, "/") {
 		reqPath = h.BaseUrl + h.Path
@@ -137,6 +134,23 @@ func (h *ApiHelper) Send() ([]byte, error) {
 	if h.QueryParam != "" {
 		reqPath += "?" + h.QueryParam
 	}
+	return reqPath
+}
+func (h *ApiHelper) setHeader(req *http.Request) {
+	if h.ContentTypeStr != "" {
+		req.Header.Set("Content-Type", h.ContentTypeStr)
+	} else {
+		req.Header.Set("Content-Type", string(h.ContentType))
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("%s %s", h.Type, h.Token))
+	req.Header.Set("Accept-Language", h.Language)
+}
+func (h *ApiHelper) Send() ([]byte, error) {
+	if h.err != nil {
+		return nil, h.err
+	}
+	client := &http.Client{}
+	reqPath := h.getReqPath()
 	var req *http.Request
 	var err error
 	if h.Body != nil {
@@ -149,21 +163,22 @@ func (h *ApiHelper) Send() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if h.ContentTypeStr != "" {
-		req.Header.Set("Content-Type", h.ContentTypeStr)
-	} else {
-		req.Header.Set("Content-Type", string(h.ContentType))
-	}
-	req.Header.Set("Authorization", fmt.Sprintf("%s %s", h.Type, h.Token))
-	req.Header.Set("Accept-Language", h.Language)
-
+	h.setHeader(req)
+	printRequestAsCurl(req)
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		log.WithField("statusCode", resp.StatusCode).Error("http error", reqPath)
+		var data []byte
+		if resp.Body != nil {
+			data, _ = io.ReadAll(resp.Body)
+			log.WithField("statusCode", resp.StatusCode).WithField("data", string(data)).Error("http error", reqPath)
+		} else {
+			log.WithField("statusCode", resp.StatusCode).WithField("data", nil).Error("http error", reqPath)
+		}
+
 		return nil, errors.New("http error")
 	}
 	data, err := io.ReadAll(resp.Body)
@@ -180,5 +195,43 @@ func (h *ApiHelper) String() string {
 		sb.WriteString(fmt.Sprintf("Body:%s", string(h.Body)))
 	}
 	return sb.String()
-
 }
+
+func printRequestAsCurl(req *http.Request) {
+	method := req.Method
+	urlStr := req.URL.String()
+	u, _ := url.Parse(urlStr)
+
+	// 构建 curl 命令
+	curlCmd := "curl -X " + method + " "
+	if u.User != nil {
+		curlCmd += "-u " + u.User.String() + " "
+	}
+	curlCmd += "'" + urlStr + "'"
+
+	// 处理请求头
+	for key, values := range req.Header {
+		for _, value := range values {
+			curlCmd += " -H '" + key + ": " + value + "'"
+		}
+	}
+
+	// 处理请求体（如果有）
+	if req.Body != nil {
+		// 这里假设请求体是字符串，实际可能需要更复杂的处理
+		body, _ := req.GetBody()
+		b, _ := io.ReadAll(body)
+		curlCmd += " --data '" + string(b) + "'"
+	}
+
+	fmt.Println(curlCmd)
+}
+
+//func (h *ApiHelper) PrintAsCurl() string {
+//	sb := strings.Builder{}
+//	//curl -X POST 'http://127.0.0.1/notify_users'    -H 'Content-Type: application/json'    -d '{"author_id":1978522,"only_visible_id":0,"guild_id":469731,"channel_id":2487355,"mention_here":0, "mention_all":0, "mention_roles":[], "mention_target_ids":[]}'
+//	reqPath := h.getReqPath()
+//
+//	curlStr := `curl -X POST '%s'    -H '%s'   -d '%s'`
+//
+//}

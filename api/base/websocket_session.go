@@ -21,6 +21,7 @@ type WebSocketSession struct {
 	SessionFile string
 	WsConn      *websocket.Conn
 	WsWriteLock *sync.Mutex
+	ReqGateway  func() (error, string)
 	//sWSClient
 }
 
@@ -35,26 +36,33 @@ type GateWayHttpApiResult struct {
 func NewWebSocketSession(token, baseUrl, sessionFile, gateWay string, compressed int) *WebSocketSession {
 	s := &WebSocketSession{
 		Token: token, BaseUrl: baseUrl, SessionFile: sessionFile}
+	s.StateSession = NewStateSession(gateWay, compressed)
+	s.NetworkProxy = s
+	s.WsWriteLock = new(sync.Mutex)
 	if content, err := os.ReadFile(sessionFile); err == nil && len(content) > 0 {
-		data := make([]interface{}, 0)
-		err := sonic.Unmarshal(content, &data)
-		if err != nil {
+		data := make([]interface{}, 0, 2)
+		err2 := sonic.Unmarshal(content, &data)
+		if err2 == nil {
 			if len(data) == 2 {
-				s.SessionId = data[0].(string)
-				s.MaxSn = data[0].(int64)
+				fmt.Printf("%v, %v", data[0], data[1])
+				if v, ok := data[0].(string); ok {
+					s.SessionId = v
+				}
+				s.MaxSn = int64(data[1].(float64))
 			}
 		} else {
 			log.WithError(err).Error("unmarsal from sessionFile error", sessionFile)
 		}
 
 	}
-	s.StateSession = NewStateSession(gateWay, compressed)
-	s.NetworkProxy = s
-	s.WsWriteLock = new(sync.Mutex)
+
 	return s
 }
 
 func (ws *WebSocketSession) ReqGateWay() (error, string) {
+	if ws.ReqGateway != nil {
+		return ws.ReqGateway()
+	}
 	client := helper.NewApiHelper("/v3/gateway/index", ws.Token, ws.BaseUrl, "", "")
 	client.SetQuery(map[string]string{"compress": strconv.Itoa(ws.Compressed)})
 	data, err := client.Get()
@@ -68,6 +76,7 @@ func (ws *WebSocketSession) ReqGateWay() (error, string) {
 		log.WithError(err).Error("ReqGateWay")
 		return err, ""
 	}
+	log.Infof("gateway URL:%s", result.Data.Url)
 	if result.Code == 0 && len(result.Data.Url) > 0 {
 		return nil, result.Data.Url
 	}

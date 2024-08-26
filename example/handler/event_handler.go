@@ -66,6 +66,7 @@ func (gteh *GroupTextEventHandler) Handle(e event.Event) error {
 		resp, err := client.SetBody(echoDataByte).Post()
 		log.Info("sent post:%s", client.String())
 		if err != nil {
+			log.WithError(err).Errorf("resp:%s", string(resp))
 			return err
 		}
 		log.Infof("resp:%s", string(resp))

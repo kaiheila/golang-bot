@@ -437,7 +437,7 @@ func (s *StateSession) Reconnect() {
 	log.Info("reconnect")
 	s.HeartBeatCron.Stop()
 	s.GateWay = ""
-	s.RecvQueue = make(chan *event2.FrameMap)
+	//s.RecvQueue = make(chan *event2.FrameMap)
 	s.MaxSn = 0
 	s.SaveSessionId("")
 	s.FSM.SetState(StatusInit)
