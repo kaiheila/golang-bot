@@ -79,6 +79,10 @@ func (s *Session) ReceiveFrame(frame *event2.FrameMap) (error, []byte) {
 	event.Trigger(EventReceiveFrame, map[string]interface{}{"frame": frame})
 	if frame.SignalType == event2.SIG_EVENT {
 		eventType := frame.Data["type"]
+		if _, ok := frame.Data["channel_type"]; !ok {
+			log.Errorf("frame data not contain channel_type,%+v", frame.Data)
+			return nil, nil
+		}
 		channelType := frame.Data["channel_type"].(string)
 		if eventType != "" {
 			name := fmt.Sprintf("%s_%d", channelType, int64(eventType.(float64)))
