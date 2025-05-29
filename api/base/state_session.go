@@ -8,6 +8,7 @@ import (
 	"github.com/bytedance/sonic"
 	event2 "github.com/kaiheila/golang-bot/api/base/event"
 	helper "github.com/kaiheila/golang-bot/api/helper"
+	"github.com/kaiheila/golang-bot/api/helper/compress"
 	"github.com/looplab/fsm"
 	cron "github.com/robfig/cron"
 	log "github.com/sirupsen/logrus"
@@ -91,7 +92,7 @@ type StateSession struct {
 	PongTimeoutChan chan time.Time
 }
 
-func NewStateSession(gateway string, compressed int) *StateSession {
+func NewStateSession(gateway string, compressed int, compressType compress.CompressType) *StateSession {
 	s := &StateSession{}
 	s.StatusParams = map[string]*StatusParam{
 		StatusInit:        &StatusParam{StartTime: 0, MaxTime: 60, FirstDelay: 1, MaxRetry: RETRY_INFINIT},
@@ -102,6 +103,7 @@ func NewStateSession(gateway string, compressed int) *StateSession {
 	}
 	s.Session.ReceiveFrameHandler = s.ReceiveFrameHandler
 	s.Compressed = compressed
+	s.CompressType = compressType
 	s.GateWay = gateway
 	s.RecvQueue = make(chan *event2.FrameMap)
 	//
@@ -257,6 +259,9 @@ func (s *StateSession) wsConnectFail() error {
 }
 
 func (s *StateSession) wsConnectOk() {
+	if s.Compressed == 1 {
+		s.Decompressor = compress.GetDecompressor(s.CompressType)
+	}
 	log.Info("wsConnectOk")
 	err := s.FSM.Event(context.Background(), EventWsConnected)
 	if err != nil {
@@ -341,9 +346,30 @@ func (s *StateSession) ReceiveFrameHandler(frame *event2.FrameMap) (error, []byt
 	return nil, nil
 
 }
-
+func (s *StateSession) NAck(sns []int64) error {
+	nackFrame := event2.NewNAckFrame(sns)
+	if s.NetworkProxy != nil {
+		data, err := sonic.Marshal(nackFrame)
+		if err != nil {
+			log.WithError(err).Error("sendHeartBeat unmarsal fail")
+			return err
+		}
+		log.WithField("frame", string(data)).Info("Send nack")
+		err = s.NetworkProxy.SendData(data)
+		if err != nil {
+			log.WithField("err", err).Error("SendNAck failed!")
+			return err
+		}
+	}
+	return nil
+}
 func (s *StateSession) SendHeartBeat() error {
-	pingFrame := event2.NewPingFrame(s.MaxSn)
+	sn := s.MaxSn
+	if sn > 3 {
+		log.Infof("sn - 2, oldSN:%d", sn)
+		sn = sn - 2
+	}
+	pingFrame := event2.NewPingFrame(sn)
 	if s.NetworkProxy != nil {
 		data, err := sonic.Marshal(pingFrame)
 		if err != nil {

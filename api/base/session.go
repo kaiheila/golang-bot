@@ -1,14 +1,12 @@
 package base
 
 import (
-	"bytes"
-	"compress/zlib"
 	"fmt"
 	"github.com/bytedance/sonic"
 	"github.com/gookit/event"
 	event2 "github.com/kaiheila/golang-bot/api/base/event"
+	"github.com/kaiheila/golang-bot/api/helper/compress"
 	log "github.com/sirupsen/logrus"
-	"io"
 )
 
 const EventReceiveFrame = "EVENT-GLOBAL-RECEIVE_FRAME"
@@ -20,6 +18,8 @@ type Session struct {
 	ReceiveFrameHandler func(frame *event2.FrameMap) (error, []byte)
 	ProcessDataHandler  func(data []byte) (error, []byte)
 	EventSyncHandle     bool
+	Decompressor        compress.DecompressorInterface
+	CompressType        compress.CompressType
 }
 
 func (s *Session) On(message string, handler event.Listener) {
@@ -35,18 +35,12 @@ func (s *Session) Trigger(eventName string, params event.M) {
 
 func (s *Session) ReceiveData(data []byte) (error, []byte) {
 	if s.Compressed == 1 {
-		b := bytes.NewReader(data)
-		r, err := zlib.NewReader(b)
-		if err != nil {
-			return err, nil
-		}
-
-		data, err = io.ReadAll(r)
+		var err error
+		data, err = s.Decompressor.Decompress(data)
 		if err != nil {
 			log.Error(err)
 			return err, nil
 		}
-
 	}
 	_, err := sonic.Get(data)
 	if err != nil {

@@ -32,3 +32,12 @@ func NewPingFrame(sn int64) *FrameMap {
 	//frame.Data = make(map[string]interface{})
 	return frame
 }
+
+func NewNAckFrame(sns []int64) *FrameMap {
+	frame := &FrameMap{}
+	frame.SignalType = SIG_NACK
+	frame.Data = map[string]interface{}{
+		"sn_list": sns,
+	}
+	return frame
+}

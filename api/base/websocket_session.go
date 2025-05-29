@@ -6,6 +6,7 @@ import (
 	"github.com/bytedance/sonic"
 	"github.com/gorilla/websocket"
 	"github.com/kaiheila/golang-bot/api/helper"
+	"github.com/kaiheila/golang-bot/api/helper/compress"
 	log "github.com/sirupsen/logrus"
 	"os"
 	"os/signal"
@@ -33,10 +34,10 @@ type GateWayHttpApiResult struct {
 	} `json:"data"`
 }
 
-func NewWebSocketSession(token, baseUrl, sessionFile, gateWay string, compressed int) *WebSocketSession {
+func NewWebSocketSession(token, baseUrl, sessionFile, gateWay string, compressed int, compressType compress.CompressType) *WebSocketSession {
 	s := &WebSocketSession{
 		Token: token, BaseUrl: baseUrl, SessionFile: sessionFile}
-	s.StateSession = NewStateSession(gateWay, compressed)
+	s.StateSession = NewStateSession(gateWay, compressed, compressType)
 	s.NetworkProxy = s
 	s.WsWriteLock = new(sync.Mutex)
 	if content, err := os.ReadFile(sessionFile); err == nil && len(content) > 0 {
@@ -64,7 +65,9 @@ func (ws *WebSocketSession) ReqGateWay() (error, string) {
 		return ws.ReqGateway()
 	}
 	client := helper.NewApiHelper("/v3/gateway/index", ws.Token, ws.BaseUrl, "", "")
-	client.SetQuery(map[string]string{"compress": strconv.Itoa(ws.Compressed)})
+	params := map[string]string{"compress": strconv.Itoa(ws.Compressed)}
+	client.SetQuery(params)
+
 	data, err := client.Get()
 	if err != nil {
 		log.WithError(err).Error("ReqGateWay")
@@ -102,6 +105,9 @@ func (ws *WebSocketSession) ConnectWebsocket(gateway string) error {
 	if ws.SessionId != "" {
 		gateway += "&" + fmt.Sprintf("sn=%d&sessionId=%s&resume=1", ws.MaxSn, ws.SessionId)
 	}
+	if ws.Compressed > 0 {
+		gateway += "&compress_type=" + compress.GetCompressTypeName(compress.CompressType(ws.CompressType))
+	}
 	log.WithField("gateway", gateway).Info("ConnectWebsocket")
 	c, resp, err := websocket.DefaultDialer.Dial(gateway, nil)
 	log.Infof("webscoket dial resp:%+v", resp)
@@ -120,7 +126,9 @@ func (ws *WebSocketSession) ConnectWebsocket(gateway string) error {
 			//ws.StateSession.Reconnect()
 		}()
 		for {
+
 			_, message, err := c.ReadMessage()
+
 			if err != nil {
 				log.Println("read:", err)
 				return

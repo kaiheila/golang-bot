@@ -2,39 +2,45 @@ package handler
 
 import (
 	"errors"
-	"fmt"
 	"github.com/bytedance/sonic"
 	"github.com/gookit/event"
 	"github.com/kaiheila/golang-bot/api/base"
 	event2 "github.com/kaiheila/golang-bot/api/base/event"
 	"github.com/kaiheila/golang-bot/api/helper"
 	log "github.com/sirupsen/logrus"
+	"strconv"
+	"strings"
+	"sync/atomic"
 )
 
 type ReceiveFrameHandler struct {
 }
 
 func (rf *ReceiveFrameHandler) Handle(e event.Event) error {
-	log.WithField("event", e).WithField("data", e.Data()).Info("ReceiveFrameHandler receive frame.")
+	//log.WithField("event", e).WithField("data", e.Data()).Info("ReceiveFrameHandler receive frame.")
 
 	return nil
 }
 
 type GroupEventHandler struct {
+	ReceivedNum atomic.Int32
 }
 
 func (ge *GroupEventHandler) Handle(e event.Event) error {
-	log.WithField("event", e).Info("GroupEventHandler receive event.")
+	ge.ReceivedNum.Add(1)
+	log.WithField("receivedNum", ge.ReceivedNum).WithField("e", e).Warn("GroupEventHandler receive event.%+v", e)
 	return nil
 }
 
 type GroupTextEventHandler struct {
 	Token   string
 	BaseUrl string
+	MsgNum  atomic.Int64
+	Session *base.WebSocketSession
 }
 
 func (gteh *GroupTextEventHandler) Handle(e event.Event) error {
-	log.WithField("event", fmt.Sprintf("%+v", e.Data())).Info("收到频道内的文字消息.")
+	//log.WithField("event", fmt.Sprintf("%+v", e.Data())).Info("收到频道内的文字消息.")
 	err := func() error {
 		if _, ok := e.Data()[base.EventDataFrameKey]; !ok {
 			return errors.New("data has no frame field")
@@ -46,9 +52,24 @@ func (gteh *GroupTextEventHandler) Handle(e event.Event) error {
 		}
 		msgEvent := &event2.MessageKMarkdownEvent{}
 		err = sonic.Unmarshal(data, msgEvent)
-		log.Infof("Received json event:%+v", msgEvent)
+		gteh.MsgNum.Add(1)
+		log.Infof("MsgNum:%d, Received json event:%+v", gteh.MsgNum.Load(), msgEvent)
 		if err != nil {
 			return err
+		}
+		if strings.Contains(msgEvent.Content, "nack") {
+			items := strings.Split(msgEvent.Content, ":")
+			sns := strings.Split(items[1], ",")
+			isns := make([]int64, 0)
+			for _, sn := range sns {
+				isn, err2 := strconv.ParseInt(sn, 10, 64)
+				if err2 != nil {
+					log.Error(err2)
+				}
+				isns = append(isns, isn)
+			}
+			gteh.Session.NAck(isns)
+			return nil
 		}
 		client := helper.NewApiHelper("/v3/message/create", gteh.Token, gteh.BaseUrl, "", "")
 		if msgEvent.Author.Bot {

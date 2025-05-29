@@ -261,3 +261,21 @@ func TestUserMe(t *testing.T) {
 	}
 	t.Log(string(resp))
 }
+
+func TestUserView(t *testing.T) {
+	resp, err := helper.NewApiHelper("/v3/user/view", conf.Token, conf.BaseUrl, "", "").SetQuery(map[string]string{"user_id": "3917927897", "guild_id": "6961481406962448"}).Get()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	t.Log(string(resp))
+}
+
+func TestGetChannelList(t *testing.T) {
+	resp, err := helper.NewApiHelper("/v3/channel/list", conf.Token, conf.BaseUrl, "", "").SetQuery(map[string]string{"guild_id": "6961481406962448", "parent_id": "1"}).Get()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	t.Log(string(resp))
+}
