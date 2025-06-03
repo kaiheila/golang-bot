@@ -92,7 +92,7 @@ type StateSession struct {
 	PongTimeoutChan chan time.Time
 }
 
-func NewStateSession(gateway string, compressed int, compressType compress.CompressType) *StateSession {
+func NewStateSession(gateway string, compressed int, compressType compress.CompressType, dictName string) *StateSession {
 	s := &StateSession{}
 	s.StatusParams = map[string]*StatusParam{
 		StatusInit:        &StatusParam{StartTime: 0, MaxTime: 60, FirstDelay: 1, MaxRetry: RETRY_INFINIT},
@@ -106,6 +106,8 @@ func NewStateSession(gateway string, compressed int, compressType compress.Compr
 	s.CompressType = compressType
 	s.GateWay = gateway
 	s.RecvQueue = make(chan *event2.FrameMap)
+	s.CompressDictName = dictName
+
 	//
 	s.FSM = fsm.NewFSM(
 		StatusStart,
@@ -365,10 +367,6 @@ func (s *StateSession) NAck(sns []int64) error {
 }
 func (s *StateSession) SendHeartBeat() error {
 	sn := s.MaxSn
-	if sn > 3 {
-		log.Infof("sn - 2, oldSN:%d", sn)
-		sn = sn - 2
-	}
 	pingFrame := event2.NewPingFrame(sn)
 	if s.NetworkProxy != nil {
 		data, err := sonic.Marshal(pingFrame)

@@ -2,8 +2,13 @@ package compress
 
 import (
 	"bytes"
+	"github.com/klauspost/compress/zip"
+	"github.com/klauspost/compress/zstd"
+	"github.com/sirupsen/logrus"
 	"github.com/valyala/gozstd"
 	"io"
+	"os"
+	"strings"
 	"sync"
 )
 
@@ -132,7 +137,9 @@ func NewZstdPerMessageDecompressor() DecompressorInterface {
 }
 
 func (z *ZstdPerMessageDecompressor) Decompress(data []byte) ([]byte, error) {
-	return gozstd.Decompress(nil, data)
+	decoder := zstdDecodePool.Get().(*zstd.Decoder)
+	defer zstdDecodePool.Put(decoder)
+	return decoder.DecodeAll(data, nil)
 }
 
 func (z *ZstdPerMessageDecompressor) Reset() error {
@@ -141,4 +148,59 @@ func (z *ZstdPerMessageDecompressor) Reset() error {
 
 func (z *ZstdPerMessageDecompressor) Recycle() error {
 	return nil
+}
+
+var zstdEncodePoolMap map[string]*sync.Pool
+var zstdDecodePool *sync.Pool
+
+func InitZSTDPool(dictPath string) {
+	logrus.Infof("load zstd pool from dict:%s", dictPath)
+	zstdEncodePoolMap = make(map[string]*sync.Pool)
+	data, err := os.ReadFile(dictPath)
+	if err != nil {
+		panic(err)
+	}
+	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		panic(err)
+	}
+	dicts := make([][]byte, 0)
+	for _, tt := range zr.File {
+		if !strings.HasSuffix(tt.Name, ".dict") {
+			continue
+		}
+		func() {
+			r, err := tt.Open()
+			if err != nil {
+				panic(err)
+			}
+			defer r.Close()
+			in, err := io.ReadAll(r)
+			if err != nil {
+				panic(err)
+			}
+
+			dicts = append(dicts, in)
+			item := sync.Pool{
+				New: func() interface{} {
+					writer, err := zstd.NewWriter(nil, zstd.WithEncoderLevel(zstd.SpeedDefault), zstd.WithEncoderDict(in))
+					if err != nil {
+						panic(err)
+					}
+					return writer
+				},
+			}
+			zstdEncodePoolMap[tt.Name] = &item
+		}()
+	}
+
+	zstdDecodePool = &sync.Pool{
+		New: func() interface{} {
+			decoder, err := zstd.NewReader(nil, zstd.WithDecoderDicts(dicts...))
+			if err != nil {
+				panic(err)
+			}
+			return decoder
+		},
+	}
 }

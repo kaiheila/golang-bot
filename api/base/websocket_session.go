@@ -34,10 +34,10 @@ type GateWayHttpApiResult struct {
 	} `json:"data"`
 }
 
-func NewWebSocketSession(token, baseUrl, sessionFile, gateWay string, compressed int, compressType compress.CompressType) *WebSocketSession {
+func NewWebSocketSession(token, baseUrl, sessionFile, gateWay string, compressed int, compressType compress.CompressType, dictName string) *WebSocketSession {
 	s := &WebSocketSession{
 		Token: token, BaseUrl: baseUrl, SessionFile: sessionFile}
-	s.StateSession = NewStateSession(gateWay, compressed, compressType)
+	s.StateSession = NewStateSession(gateWay, compressed, compressType, dictName)
 	s.NetworkProxy = s
 	s.WsWriteLock = new(sync.Mutex)
 	if content, err := os.ReadFile(sessionFile); err == nil && len(content) > 0 {
@@ -107,6 +107,9 @@ func (ws *WebSocketSession) ConnectWebsocket(gateway string) error {
 	}
 	if ws.Compressed > 0 {
 		gateway += "&compress_type=" + compress.GetCompressTypeName(compress.CompressType(ws.CompressType))
+		if ws.CompressDictName != "" {
+			gateway += "&dict=" + ws.CompressDictName
+		}
 	}
 	log.WithField("gateway", gateway).Info("ConnectWebsocket")
 	c, resp, err := websocket.DefaultDialer.Dial(gateway, nil)

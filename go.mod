@@ -7,6 +7,7 @@ require (
 	github.com/bytedance/sonic v1.8.1
 	github.com/gookit/event v1.0.6
 	github.com/gorilla/websocket v1.5.0
+	github.com/klauspost/compress v1.18.0
 	github.com/looplab/fsm v1.0.1
 	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.9.0

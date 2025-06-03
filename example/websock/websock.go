@@ -12,8 +12,8 @@ func main() {
 	log.SetReportCaller(true)
 	log.SetFormatter(&log.TextFormatter{})
 	log.SetLevel(log.InfoLevel)
-
-	session := base.NewWebSocketSession(conf.Token, conf.BaseUrl, "./session.pid", "", 1, compress.CompressTypeZstdStream)
+	compress.InitZSTDPool("/Users/mikewei/dev/gowork/src/ws-connector/dict/zstd.zip")
+	session := base.NewWebSocketSession(conf.Token, conf.BaseUrl, "./session.pid", "", 1, compress.CompressTypeZstdPerMessage, "test.dict")
 	session.On(base.EventReceiveFrame, &handler.ReceiveFrameHandler{})
 	session.On("GROUP*", &handler.GroupEventHandler{})
 	session.On("GROUP_9", &handler.GroupTextEventHandler{Token: conf.Token, BaseUrl: conf.BaseUrl, Session: session})
