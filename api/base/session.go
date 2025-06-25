@@ -20,7 +20,7 @@ type Session struct {
 	EventSyncHandle     bool
 	Decompressor        compress.DecompressorInterface
 	CompressType        compress.CompressType
-	CompressDictName    string
+	CompressDictVersion string
 }
 
 func (s *Session) On(message string, handler event.Listener) {

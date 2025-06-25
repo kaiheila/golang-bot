@@ -2,7 +2,7 @@ package compress
 
 import (
 	"bytes"
-	"compress/zlib"
+	"github.com/klauspost/compress/zlib"
 	"github.com/sirupsen/logrus"
 	"io"
 	"sync"
@@ -48,15 +48,19 @@ func (z *ZlibStreamCompressor) Recycle() error {
 }
 
 type ZlibStreamDecompressor struct {
-	decoder   io.ReadCloser
-	inWriter  io.Writer
-	buffer    bytes.Buffer
-	outReader chan []byte
-	mu        sync.Mutex
+	decoder io.ReadCloser
+	buf     bytes.Buffer
+	mu      sync.Mutex
 }
 
 func NewZlibStreamDecompressor() DecompressorInterface {
-	z := &ZlibStreamDecompressor{}
+	buf := bytes.Buffer{}
+	decoder, err := zlib.NewReader(&buf)
+	if err != nil {
+		logrus.Error(err)
+		return nil
+	}
+	z := &ZlibStreamDecompressor{decoder: decoder, buf: buf}
 	return z
 }
 
@@ -65,40 +69,31 @@ func (z *ZlibStreamDecompressor) Decompress(data []byte) ([]byte, error) {
 	defer z.mu.Unlock()
 	// 使用缓冲区复制数据
 	//// 创建带缓冲的写入器
-	z.inWriter.Write(data)
+	z.buf.Write(data)
+	out := bytes.Buffer{}
+	for {
+		buf := make([]byte, 1024)
+		n, err := z.decoder.Read(buf)
+		if err != nil && err != io.EOF {
+			return nil, err
+		}
+		if n > 0 {
+			out.Write(buf[:n])
+		} else if n == 0 || err == io.EOF {
+			break
+		}
 
-	return z.buffer.Bytes(), nil
+	}
+	return out.Bytes(), nil
 }
 
 func (z *ZlibStreamDecompressor) Reset() error {
-	reader, writer := io.Pipe()
-	z.inWriter = writer
-	var err error
-	go func() {
-		z.decoder, err = zlib.NewReader(reader)
-		if err != nil {
-			logrus.Error(err)
-			return
-		}
-		for {
-			buffer := make([]byte, 1024)
-			n, err := z.decoder.Read(buffer)
-			if err != nil {
-				logrus.Error(err)
-				continue
-			}
-			z.buffer.Write(buffer[:n])
-
-		}
-	}()
-	if err != nil {
-		return err
-	}
+	z.buf.Reset()
 	return nil
 }
 
 func (z *ZlibStreamDecompressor) Recycle() error {
-	z.buffer.Reset()
+	z.buf.Reset()
 	z.decoder = nil
 	return nil
 }

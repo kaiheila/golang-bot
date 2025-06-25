@@ -279,3 +279,17 @@ func TestGetChannelList(t *testing.T) {
 	}
 	t.Log(string(resp))
 }
+
+func TestBlackListCreate(t *testing.T) {
+	bodyData, _ := sonic.Marshal(map[string]interface{}{
+		"guild_id":  "6961481406962448",
+		"target_id": "406324848",
+		"remark":    "test",
+	})
+	resp, err := helper.NewApiHelper("/v3/blacklist/create", conf.Token, conf.BaseUrl, "", "").SetBody(bodyData).Post()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	t.Log(string(resp))
+}
