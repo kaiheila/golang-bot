@@ -166,7 +166,7 @@ func (ws *WebSocketSession) SaveSessionId(sessionId string) error {
 	}
 	err = os.WriteFile(ws.SessionFile, data, 0644)
 	if err != nil {
-		log.WithError(err).WithField("data", data).Error("SaveSessionId")
+		log.WithError(err).WithField("sessionId", sessionId).Error("SaveSessionId")
 		return err
 	}
 	return nil
