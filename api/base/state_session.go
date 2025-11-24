@@ -92,7 +92,7 @@ type StateSession struct {
 	PongTimeoutChan chan time.Time
 }
 
-func NewStateSession(gateway string, compressed int, compressType compress.CompressType, dictVersion string) *StateSession {
+func NewStateSession(gateway string, compressed int, compressType compress.CompressType, dictVersion string, headerVersion int) *StateSession {
 	s := &StateSession{}
 	s.StatusParams = map[string]*StatusParam{
 		StatusInit:        &StatusParam{StartTime: 0, MaxTime: 60, FirstDelay: 1, MaxRetry: RETRY_INFINIT},
@@ -107,6 +107,7 @@ func NewStateSession(gateway string, compressed int, compressType compress.Compr
 	s.GateWay = gateway
 	s.RecvQueue = make(chan *event2.FrameMap)
 	s.CompressDictVersion = dictVersion
+	s.HeaderVersion = headerVersion
 
 	//
 	s.FSM = fsm.NewFSM(

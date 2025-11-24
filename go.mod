@@ -11,7 +11,6 @@ require (
 	github.com/looplab/fsm v1.0.1
 	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.9.0
-	github.com/valyala/gozstd v1.21.2
 )
 
 replace github.com/gookit/event v1.0.6 => github.com/idodo/event v1.0.1

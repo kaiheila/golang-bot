@@ -34,10 +34,10 @@ type GateWayHttpApiResult struct {
 	} `json:"data"`
 }
 
-func NewWebSocketSession(token, baseUrl, sessionFile, gateWay string, compressed int, compressType compress.CompressType, dictVersion string) *WebSocketSession {
+func NewWebSocketSession(token, baseUrl, sessionFile, gateWay string, compressed int, compressType compress.CompressType, dictVersion string, headerVersion int) *WebSocketSession {
 	s := &WebSocketSession{
 		Token: token, BaseUrl: baseUrl, SessionFile: sessionFile}
-	s.StateSession = NewStateSession(gateWay, compressed, compressType, dictVersion)
+	s.StateSession = NewStateSession(gateWay, compressed, compressType, dictVersion, headerVersion)
 	s.NetworkProxy = s
 	s.WsWriteLock = new(sync.Mutex)
 	if content, err := os.ReadFile(sessionFile); err == nil && len(content) > 0 {

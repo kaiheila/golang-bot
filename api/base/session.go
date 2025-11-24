@@ -21,6 +21,7 @@ type Session struct {
 	Decompressor        compress.DecompressorInterface
 	CompressType        compress.CompressType
 	CompressDictVersion string
+	HeaderVersion       int
 }
 
 func (s *Session) On(message string, handler event.Listener) {
@@ -35,6 +36,14 @@ func (s *Session) Trigger(eventName string, params event.M) {
 }
 
 func (s *Session) ReceiveData(data []byte) (error, []byte) {
+	sig := event2.BaseSignal{}
+	sig.Version = s.HeaderVersion
+	err := sig.Decode(data)
+	if err != nil {
+		log.WithError(err).WithField("data", fmt.Sprintf("%x", data)).Error("Decode signal error")
+		return err, nil
+	}
+	data = sig.Payload
 	if s.Compressed == 1 {
 		var err error
 		data, err = s.Decompressor.Decompress(data)
@@ -43,7 +52,7 @@ func (s *Session) ReceiveData(data []byte) (error, []byte) {
 			return err, nil
 		}
 	}
-	_, err := sonic.Get(data)
+	_, err = sonic.Get(data)
 	if err != nil {
 		log.Error("Json Unmarshal err.", err)
 		return err, nil
@@ -74,11 +83,15 @@ func (s *Session) ReceiveFrame(frame *event2.FrameMap) (error, []byte) {
 	event.Trigger(EventReceiveFrame, map[string]interface{}{"frame": frame})
 	if frame.SignalType == event2.SIG_EVENT {
 		eventType := frame.Data["type"]
-		if _, ok := frame.Data["channel_type"]; !ok {
-			log.Errorf("frame data not contain channel_type,%+v", frame.Data)
+		var channelType string
+		if v, ok := frame.Data["channel_type"]; ok {
+			channelType = v.(string)
+		} else if v2, ok2 := frame.Data["channelType"]; ok2 {
+			channelType = v2.(string)
+		} else {
+			log.Errorf("frame data not contain channel_type and channelType,%+v", frame.Data)
 			return nil, nil
 		}
-		channelType := frame.Data["channel_type"].(string)
 		if eventType != "" {
 			name := fmt.Sprintf("%s_%d", channelType, int64(eventType.(float64)))
 			fireEvent := event.NewBasic(name, map[string]interface{}{EventDataFrameKey: frame, EventDataSessionKey: s})
