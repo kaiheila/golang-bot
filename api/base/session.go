@@ -12,6 +12,8 @@ import (
 const EventReceiveFrame = "EVENT-GLOBAL-RECEIVE_FRAME"
 const EventDataFrameKey = "frame"
 const EventDataSessionKey = "session"
+const EventSigReceive = "SIG_RECEIVE"
+const EventSigDecoded = "SIG_DECODE"
 
 type Session struct {
 	Compressed          int
@@ -36,6 +38,8 @@ func (s *Session) Trigger(eventName string, params event.M) {
 }
 
 func (s *Session) ReceiveData(data []byte) (error, []byte) {
+	fireEvent := event.NewBasic(EventSigReceive, map[string]interface{}{EventDataFrameKey: data})
+	event.Trigger(fireEvent.Name(), fireEvent.Data())
 	sig := event2.BaseSignal{}
 	sig.Version = s.HeaderVersion
 	err := sig.Decode(data)
@@ -43,6 +47,8 @@ func (s *Session) ReceiveData(data []byte) (error, []byte) {
 		log.WithError(err).WithField("data", fmt.Sprintf("%x", data)).Error("Decode signal error")
 		return err, nil
 	}
+
+	event.Trigger(EventSigDecoded, map[string]any{"signal": &sig})
 	data = sig.Payload
 	if s.Compressed == 1 {
 		var err error
@@ -67,6 +73,7 @@ func (s *Session) ReceiveData(data []byte) (error, []byte) {
 	frame := event2.ParseFrameMapByData(data)
 	if s.HeaderVersion > 0 {
 		frame.SerialNumber = sig.SN
+		//log.Infof("Receive frame from server,serialNumber:%d", frame.SerialNumber)
 	}
 	log.WithField("frame", frame).Info("Receive frame from server")
 	if frame != nil {
