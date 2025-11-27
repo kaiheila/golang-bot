@@ -3,9 +3,20 @@ package event
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 
 	"github.com/bytedance/sonic/ast"
 )
+
+// decodeError 解码错误类型
+type decodeError struct {
+	msg string
+}
+
+// Error 实现error接口
+func (e *decodeError) Error() string {
+	return fmt.Sprintf("decode error: %s", e.msg)
+}
 
 // SignalInterface 定义signal的接口
 type SignalInterface interface {
@@ -211,20 +222,20 @@ func Decode(data []byte, version int) (*BaseSignal, error) {
 
 // decodeWithHeader 解析带header的signal
 func decodeWithHeader(data []byte) (*BaseSignal, error) {
-	buf := bytes.NewReader(data)
+	if len(data) < 2 {
+		return nil, &decodeError{msg: "invalid data length"}
+	}
+
+	// 直接从字节切片读取，使用索引偏移
+	index := 0
 
 	// 读取版本
-	versionByte, err := buf.ReadByte()
-	if err != nil {
-		return nil, err
-	}
-	version := int(versionByte)
+	version := int(data[index])
+	index++
 
 	// 读取标志位
-	flagByte, err := buf.ReadByte()
-	if err != nil {
-		return nil, err
-	}
+	flagByte := data[index]
+	index++
 	hasSN := (flagByte & 0x80) != 0
 
 	signal := &BaseSignal{
@@ -233,59 +244,50 @@ func decodeWithHeader(data []byte) (*BaseSignal, error) {
 	}
 
 	if hasSN {
-		// 读取序列号长度标识
-		snLenByte, err := buf.ReadByte()
-		if err != nil {
-			return nil, err
+		if index >= len(data) {
+			return nil, &decodeError{msg: "invalid data length for SN"}
 		}
+
+		// 读取序列号长度标识
+		snLenByte := data[index]
+		index++
 		snLen := int((snLenByte >> 4) & 0x0F)
 
 		// 根据长度读取序列号
 		switch snLen {
 		case 0:
 			// 1字节
-			snByte, err := buf.ReadByte()
-			if err != nil {
-				return nil, err
+			if index >= len(data) {
+				return nil, &decodeError{msg: "invalid data length for 1-byte SN"}
 			}
-			signal.SN = int64(snByte)
+			signal.SN = int64(data[index])
+			index++
 		case 1:
 			// 2字节
-			snBuf := make([]byte, 2)
-			_, err := buf.Read(snBuf)
-			if err != nil {
-				return nil, err
+			if index+1 >= len(data) {
+				return nil, &decodeError{msg: "invalid data length for 2-byte SN"}
 			}
-			signal.SN = int64(binary.BigEndian.Uint16(snBuf))
+			signal.SN = int64(binary.BigEndian.Uint16(data[index : index+2]))
+			index += 2
 		case 2:
 			// 4字节
-			snBuf := make([]byte, 4)
-			_, err := buf.Read(snBuf)
-			if err != nil {
-				return nil, err
+			if index+3 >= len(data) {
+				return nil, &decodeError{msg: "invalid data length for 4-byte SN"}
 			}
-			signal.SN = int64(binary.BigEndian.Uint32(snBuf))
+			signal.SN = int64(binary.BigEndian.Uint32(data[index : index+4]))
+			index += 4
 		case 3:
 			// 8字节
-			snBuf := make([]byte, 8)
-			_, err := buf.Read(snBuf)
-			if err != nil {
-				return nil, err
+			if index+7 >= len(data) {
+				return nil, &decodeError{msg: "invalid data length for 8-byte SN"}
 			}
-			signal.SN = int64(binary.BigEndian.Uint64(snBuf))
+			signal.SN = int64(binary.BigEndian.Uint64(data[index : index+8]))
+			index += 8
 		}
 	}
 
-	// 读取payload
-	remaining := buf.Len()
-	actualLength := remaining
-
-	payload := make([]byte, actualLength)
-	_, err = buf.Read(payload)
-	if err != nil {
-		return nil, err
-	}
-	signal.Payload = payload
+	// 0copy：直接使用原始数据的子切片作为payload，避免复制
+	signal.Payload = data[index:]
 
 	return signal, nil
 }
