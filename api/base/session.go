@@ -65,6 +65,9 @@ func (s *Session) ReceiveData(data []byte) (error, []byte) {
 		}
 	}
 	frame := event2.ParseFrameMapByData(data)
+	if s.HeaderVersion > 0 {
+		frame.SerialNumber = sig.SN
+	}
 	log.WithField("frame", frame).Info("Receive frame from server")
 	if frame != nil {
 		if s.ReceiveFrameHandler != nil {
