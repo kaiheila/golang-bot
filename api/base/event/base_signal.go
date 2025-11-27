@@ -174,7 +174,7 @@ func (s *BaseSignal) encodeWithHeader() ([]byte, error) {
 		snLen = 3 // 8字节
 	}
 
-	snLenByte := uint8(snLen) << 4 // 高4位表示序列号长度
+	snLenByte := uint8(snLen) << 6 // 高2位表示序列号长度
 	// 保留的4位填0
 	buf.WriteByte(snLenByte)
 
@@ -251,7 +251,7 @@ func decodeWithHeader(data []byte) (*BaseSignal, error) {
 		// 读取序列号长度标识
 		snLenByte := data[index]
 		index++
-		snLen := int((snLenByte >> 4) & 0x0F)
+		snLen := int((snLenByte >> 6) & 0x03)
 
 		// 根据长度读取序列号
 		switch snLen {
