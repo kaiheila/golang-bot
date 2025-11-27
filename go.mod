@@ -4,7 +4,7 @@ go 1.22
 
 require (
 	github.com/avast/retry-go/v4 v4.3.3
-	github.com/bytedance/sonic v1.8.1
+	github.com/bytedance/sonic v1.14.2
 	github.com/gookit/event v1.0.6
 	github.com/gorilla/websocket v1.5.0
 	github.com/klauspost/compress v1.18.0
@@ -16,9 +16,12 @@ require (
 replace github.com/gookit/event v1.0.6 => github.com/idodo/event v1.0.1
 
 require (
+	github.com/bytedance/gopkg v0.1.3 // indirect
+	github.com/bytedance/sonic/loader v0.4.0 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
-	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
+	github.com/cloudwego/base64x v0.1.6 // indirect
+	github.com/klauspost/cpuid/v2 v2.2.9 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	golang.org/x/arch v0.0.0-20210923205945-b76863e36670 // indirect
-	golang.org/x/sys v0.0.0-20220715151400-c0bba94af5f8 // indirect
+	golang.org/x/sys v0.22.0 // indirect
 )

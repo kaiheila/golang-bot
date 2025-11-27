@@ -70,6 +70,7 @@ func (ws *WebSocketSession) ReqGateWay() (error, string) {
 		params["compress-type"] = "zstd"
 		params["dict-version"] = ws.CompressDictVersion
 	}
+	params["header-version"] = strconv.Itoa(ws.HeaderVersion)
 
 	client.SetQuery(params)
 
