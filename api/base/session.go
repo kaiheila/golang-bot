@@ -47,8 +47,9 @@ func (s *Session) ReceiveData(data []byte) (error, []byte) {
 		log.WithError(err).WithField("data", fmt.Sprintf("%x", data)).Error("Decode signal error")
 		return err, nil
 	}
-
-	event.Trigger(EventSigDecoded, map[string]any{"signal": &sig})
+	if sig.SN > 0 {
+		event.Trigger(EventSigDecoded, map[string]any{"signal": &sig})
+	}
 	data = sig.Payload
 	if s.Compressed == 1 {
 		var err error
