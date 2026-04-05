@@ -13,6 +13,12 @@ type FrameMap struct {
 	Data         map[string]interface{} `json:"d"`
 	SerialNumber int64                  `json:"sn"`
 }
+type NackFrameMap struct {
+	SignalType   int32                  `json:"s"`
+	SerialNumber int64                  `json:"sn"`
+	Data         map[string]interface{} `json:"d"`
+	SNList       []int64                `json:"sn_list"`
+}
 
 func ParseFrameMapByData(data []byte) *FrameMap {
 
@@ -33,11 +39,10 @@ func NewPingFrame(sn int64) *FrameMap {
 	return frame
 }
 
-func NewNAckFrame(sns []int64) *FrameMap {
-	frame := &FrameMap{}
+func NewNAckFrame(sns []int64) *NackFrameMap {
+	frame := &NackFrameMap{}
 	frame.SignalType = SIG_NACK
-	frame.Data = map[string]interface{}{
-		"sn_list": sns,
-	}
+	frame.SNList = sns
+	frame.Data = make(map[string]interface{})
 	return frame
 }

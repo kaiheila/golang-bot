@@ -18,7 +18,6 @@ replace github.com/gookit/event v1.0.6 => github.com/idodo/event v1.0.1
 require (
 	github.com/bytedance/gopkg v0.1.3 // indirect
 	github.com/bytedance/sonic/loader v0.4.0 // indirect
-	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.9 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect

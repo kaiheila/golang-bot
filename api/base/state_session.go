@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/avast/retry-go/v4"
 	"github.com/bytedance/sonic"
 	event2 "github.com/kaiheila/golang-bot/api/base/event"
@@ -12,7 +14,6 @@ import (
 	"github.com/looplab/fsm"
 	cron "github.com/robfig/cron"
 	log "github.com/sirupsen/logrus"
-	"time"
 )
 
 type State struct {
@@ -231,7 +232,9 @@ func (s *StateSession) Retry(e *fsm.Event, handler func() error, errHandler func
 		retry.Delay(time.Second*time.Duration(firstDelay)),
 		retry.MaxDelay(time.Second*time.Duration(maxTime)),
 		retry.Attempts(uint(maxRetry)),
-		retry.OnRetry(func(n uint, err error) { log.WithError(err).Infof("try %d times call function %s", n, handler) }),
+		retry.OnRetry(func(n uint, err error) {
+			log.WithError(err).Infof("try %d times call function %s", n, helper.GetFunctionName(handler))
+		}),
 	)
 	if err != nil && errHandler != nil {
 		errHandler()
@@ -324,6 +327,8 @@ func (s *StateSession) ReceiveFrameHandler(frame *event2.FrameMap) (error, []byt
 			if s.FSM.Current() == StatusConnected {
 				if frame.SerialNumber > s.MaxSn {
 					s.MaxSn = frame.SerialNumber
+					// 保存到 session file中
+					s.SaveSessionId(s.SessionId)
 				}
 				s.RecvQueue <- frame
 			}
