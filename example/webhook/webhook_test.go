@@ -178,6 +178,34 @@ func TestDirectMessageList(t *testing.T) {
 	t.Log(string(resp))
 }
 
+func TestDirectMessageCreate(t *testing.T) {
+	body, _ := sonic.Marshal(map[string]interface{}{
+		"type":      9,
+		"target_id": "3917927897",
+		"content":   "测试",
+	})
+	resp, err := helper.NewApiHelper("/v3/direct-message/create", conf.Token, conf.BaseUrl, "", "").
+		SetBody(body).Post()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	t.Log(string(resp))
+}
+
+func TestDirectMessageUpdate(t *testing.T) {
+	body, _ := sonic.Marshal(map[string]interface{}{
+		"msg_id":  "3c1517bf-bc17-441c-9f97-b99786532cd9",
+		"content": "测试2222",
+	})
+	resp, err := helper.NewApiHelper("/v3/direct-message/update", conf.Token, conf.BaseUrl, "", "").
+		SetBody(body).Post()
+	if err != nil {
+		t.Error(err)
+	}
+	t.Log(string(resp))
+}
+
 func TestUserChatCreate(t *testing.T) {
 
 }
@@ -263,7 +291,7 @@ func TestUserMe(t *testing.T) {
 }
 
 func TestUserView(t *testing.T) {
-	resp, err := helper.NewApiHelper("/v3/user/view", conf.Token, conf.BaseUrl, "", "").SetQuery(map[string]string{"user_id": "3917927897", "guild_id": "6961481406962448"}).Get()
+	resp, err := helper.NewApiHelper("/v3/user/view", conf.Token, conf.BaseUrl, "", "").SetQuery(map[string]string{"user_id": "3576061439", "guild_id": "6961481406962448"}).Get()
 	if err != nil {
 		t.Error(err)
 		return

@@ -2,9 +2,11 @@ package base
 
 import (
 	"errors"
+
 	"github.com/bytedance/sonic"
 	event2 "github.com/kaiheila/golang-bot/api/base/event"
 	"github.com/kaiheila/golang-bot/api/helper"
+	"github.com/kaiheila/golang-bot/api/helper/compress"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -14,7 +16,7 @@ type WebhookSession struct {
 	VerifyToken string
 }
 
-func NewWebhookSession(encryptKey, verityToken string, compress int) *WebhookSession {
+func NewWebhookSession(encryptKey, verityToken string, compressTag int) *WebhookSession {
 	session := &WebhookSession{}
 	if encryptKey != "" {
 		session.EncryptKey = encryptKey
@@ -22,7 +24,8 @@ func NewWebhookSession(encryptKey, verityToken string, compress int) *WebhookSes
 	if verityToken != "" {
 		session.VerifyToken = verityToken
 	}
-	session.Compressed = compress
+	session.Decompressor = compress.GetDecompressor(compress.CompressTypeZlibPerMessage)
+	session.Compressed = compressTag
 	session.Session.ProcessDataHandler = session.ProcessData
 	session.Session.ReceiveFrameHandler = session.ReceiveFrameHandler
 	return session
